@@ -5,3 +5,99 @@ date: "3/11/2021"
 output: html_document
 ---
 
+```{r}
+knitr::opts_chunk$set(warning = FALSE,message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(rpart)
+library(randomForest)
+library(MLmetrics)
+```
+
+
+```{r}
+preprocess <- function(tib,test=FALSE){
+  date_columns <- c("Expected_checkin","Expected_checkout","Booking_date")
+  tib <- tib %>% 
+    mutate_at(vars(contains(date_columns)),~ as.Date(.x,format="%m/%d/%Y")) %>% 
+    mutate_if(is.character,factor)
+  if(!test){
+    tib <- tib %>% 
+      select(-`Reservation-id`) %>% 
+      mutate(Reservation_Status = factor(Reservation_Status,
+                                         levels=c("Check-In","Canceled","No-Show")))
+  }
+  tib
+}
+```
+
+```{r}
+train <- read_csv("../../data/Hotel-A-train.csv") %>% preprocess()
+test <- read_csv("../../data/Hotel-A-test.csv") %>% preprocess(test=TRUE)
+valid <- read_csv("../../data/Hotel-A-validation.csv") %>% preprocess()
+train %>% write_csv("../../data/processed/train_preproc.csv")
+test %>% write_csv("../../data/processed/test_preproc.csv")
+valid %>% write_csv("../../data/processed/valid_preproc.csv")
+```
+
+```{r}
+glimpse(train)
+```
+
+
+```{r}
+table(train$Reservation_Status) / nrow(train)
+table(valid$Reservation_Status) / nrow(valid)
+```
+
+```{r}
+skimr::skim(train)
+```
+
+```{r}
+skimr::skim(valid)
+```
+
+```{r}
+# TODO write function to get chisquare p values of all factor variables
+table(train$Hotel_Type,train$Reservation_Status) %>% summary() %>% .$p.value
+```
+
+```{r}
+# TODO insert evaluation pipeline here
+```
+
+```{r}
+model <- randomForest(Reservation_Status ~ .,data=train)
+```
+
+```{r}
+evaluate <- function(y_preds,y_true){
+  print(ConfusionMatrix(y_preds,y_true))
+  print(F1_Score(y_preds,y_true))
+  print(Precision(y_preds,y_true))
+  print(Recall(y_preds,y_true))
+}
+```
+
+```{r}
+y_preds <- predict(model,newdata=valid %>% select(-Reservation_Status))
+evaluate(y_preds,valid$Reservation_Status)
+```
+
+
+```{r}
+make_submission <- function(test_preds,name){
+  submission <- tibble(`Reservation-id` = test$`Reservation-id`,
+                       Reservation_status = test_preds)
+  submission %>% write_csv(paste("../../data/submissions/",name,"-",Sys.time(),".csv"))
+}
+```
+
+```{r}
+test_preds <- predict(model,newdata = test)
+make_submission(as.numeric(test_preds),"naive")
+```
+
