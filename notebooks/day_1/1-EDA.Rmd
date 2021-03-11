@@ -72,6 +72,12 @@ map_dfr(cat_cols, function(x){
 ```
 
 ```{r}
+GGally::ggpairs(train,aes(color=Reservation_Status,alpha=0.2),progress = FALSE)
+ggsave("outputs/pair_plot_colored.jpg",width = 841,height = 594,units = "mm")
+```
+
+
+```{r}
 # TODO insert evaluation pipeline here
 ```
 
