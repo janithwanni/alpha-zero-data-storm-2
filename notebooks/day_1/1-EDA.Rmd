@@ -25,11 +25,28 @@ preprocess <- function(tib,test=FALSE){
     mutate_if(is.character,factor) %>% 
     mutate(Lag = as.numeric(Expected_checkin - Booking_date,units="days"),
            Duration = as.numeric(Expected_checkout - Expected_checkin,units="days")) %>% 
-    select(-all_of(date_columns))
-  cat_cols <- tib %>% select_if(is.factor) %>% colnames()
-  cat_cols_keep <- c("Meal_Type","Deposit_type","Reservation_Status")
-  cat_cols_rmv <- cat_cols[!(cat_cols %in% cat_cols_keep)]
-  # tib <- tib %>% select(-all_of(cat_cols_rmv))
+    select(-all_of(date_columns)) %>% 
+    mutate(Income_number = case_when(
+      Income == "<25K" ~ 25000,
+      Income == ">100K" ~ 100000,
+      Income == "25K --50K" ~ 37500,
+      Income == "50K -- 100K" ~ 75000
+    ),
+    Cost = Duration * Room_Rate,
+    Cost_Income = Cost / Income_number,
+    Visit_Cancel = factor(case_when(
+      Visted_Previously == "Yes" & Previous_Cancellations == "Yes" ~ "Visit_n_Cancel",
+      Visted_Previously == "Yes" & Previous_Cancellations == "No" ~ "Visit_n_No_Cancel",
+      Visted_Previously == "No" & Previous_Cancellations == "Yes" ~ "No_Visit_n_Cancel",
+      Visted_Previously == "No" & Previous_Cancellations == "No" ~ "No_Visit_n_No_Cancel",
+    )),
+    Total_PAX = Adults + Babies + Children,
+    N_Minors = Babies + Children) 
+  # cat_cols <- tib %>% select_if(is.factor) %>% colnames()
+  # cat_cols_keep <- c("Meal_Type","Deposit_type","Reservation_Status")
+  # cat_cols_rmv <- cat_cols[!(cat_cols %in% cat_cols_keep)]
+    # final_vars <- c("Meal")
+  # tib <- tib %>% select(all_of())
   if(!test){
     tib <- tib %>% 
       select(-`Reservation-id`) %>% 
@@ -72,8 +89,8 @@ map_dfr(cat_cols, function(x){
 ```
 
 ```{r}
-GGally::ggpairs(train,aes(color=Reservation_Status,alpha=0.2),progress = FALSE)
-ggsave("outputs/pair_plot_colored.jpg",width = 841,height = 594,units = "mm")
+#GGally::ggpairs(train,aes(color=Reservation_Status,alpha=0.2),progress = FALSE)
+#ggsave("outputs/pair_plot_colored.jpg",width = 841,height = 594,units = "mm")
 ```
 
 
@@ -86,11 +103,28 @@ model <- randomForest(Reservation_Status ~ .,data=train)
 ```
 
 ```{r}
+plot_importances <- function(model){
+  imp <- importance(model)
+  imp %>% 
+    as_tibble() %>% 
+    mutate(variable = factor(rownames(imp))) %>% 
+    arrange(-MeanDecreaseGini) %>% 
+    mutate(variable = fct_reorder(variable,MeanDecreaseGini)) %>% 
+  ggplot(aes(x = variable,y=MeanDecreaseGini)) + 
+    geom_col()+
+    coord_flip()
+}
+plot_importances(model)
+```
+
+
+```{r}
 evaluate <- function(y_preds,y_true){
   print(ConfusionMatrix(y_preds,y_true))
   print(F1_Score(y_preds,y_true))
   print(Precision(y_preds,y_true))
   print(Recall(y_preds,y_true))
+  print(caret::confusionMatrix(y_preds,reference=y_true,mode="everything"))
 }
 ```
 
