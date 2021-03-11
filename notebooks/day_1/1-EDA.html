@@ -197,20 +197,38 @@ summary {
 
 <pre class="r"><code>knitr::opts_chunk$set(warning = FALSE,message = FALSE)</code></pre>
 <pre class="r"><code>library(tidyverse)
-library(rpart)</code></pre>
-<pre class="r"><code>preprocess &lt;- function(tibble){
-  tibble %&gt;% 
-    mutate_at(vars(contains(c(&quot;Expected_checkin&quot;,&quot;Expected_checkout&quot;,&quot;Booking_date&quot;))),
-              ~ as.Date(.x,format=&quot;%m/%d/%Y&quot;)) %&gt;% 
+library(rpart)
+library(randomForest)
+library(MLmetrics)</code></pre>
+<pre class="r"><code>preprocess &lt;- function(tib,test=FALSE){
+  date_columns &lt;- c(&quot;Expected_checkin&quot;,&quot;Expected_checkout&quot;,&quot;Booking_date&quot;)
+  tib &lt;- tib %&gt;% 
+    mutate_at(vars(contains(date_columns)),~ as.Date(.x,format=&quot;%m/%d/%Y&quot;)) %&gt;% 
     mutate_if(is.character,factor) %&gt;% 
-    select(-`Reservation-id`)
+    mutate(Lag = as.numeric(Expected_checkin - Booking_date,units=&quot;days&quot;),
+           Duration = as.numeric(Expected_checkout - Expected_checkin,units=&quot;days&quot;)) %&gt;% 
+    select(-all_of(date_columns))
+  cat_cols &lt;- tib %&gt;% select_if(is.factor) %&gt;% colnames()
+  cat_cols_keep &lt;- c(&quot;Meal_Type&quot;,&quot;Deposit_type&quot;,&quot;Reservation_Status&quot;)
+  cat_cols_rmv &lt;- cat_cols[!(cat_cols %in% cat_cols_keep)]
+  # tib &lt;- tib %&gt;% select(-all_of(cat_cols_rmv))
+  if(!test){
+    tib &lt;- tib %&gt;% 
+      select(-`Reservation-id`) %&gt;% 
+      mutate(Reservation_Status = factor(Reservation_Status,
+                                         levels=c(&quot;Check-In&quot;,&quot;Canceled&quot;,&quot;No-Show&quot;)))
+  }
+  tib 
 }</code></pre>
 <pre class="r"><code>train &lt;- read_csv(&quot;../../data/Hotel-A-train.csv&quot;) %&gt;% preprocess()
-test &lt;- read_csv(&quot;../../data/Hotel-A-test.csv&quot;) %&gt;% preprocess()
-valid &lt;- read_csv(&quot;../../data/Hotel-A-validation.csv&quot;) %&gt;% preprocess()</code></pre>
+test &lt;- read_csv(&quot;../../data/Hotel-A-test.csv&quot;) %&gt;% preprocess(test=TRUE)
+valid &lt;- read_csv(&quot;../../data/Hotel-A-validation.csv&quot;) %&gt;% preprocess()
+train %&gt;% write_csv(&quot;../../data/processed/train_preproc.csv&quot;)
+test %&gt;% write_csv(&quot;../../data/processed/test_preproc.csv&quot;)
+valid %&gt;% write_csv(&quot;../../data/processed/valid_preproc.csv&quot;)</code></pre>
 <pre class="r"><code>glimpse(train)</code></pre>
 <pre><code>## Rows: 27,499
-## Columns: 23
+## Columns: 22
 ## $ Gender                 &lt;fct&gt; F, F, F, M, F, M, F, M, M, M, M, F, M, F, F, M…
 ## $ Age                    &lt;dbl&gt; 40, 49, 42, 25, 62, 34, 53, 40, 59, 21, 69, 52…
 ## $ Ethnicity              &lt;fct&gt; Latino, Latino, caucasian, African American, L…
@@ -218,9 +236,6 @@ valid &lt;- read_csv(&quot;../../data/Hotel-A-validation.csv&quot;) %&gt;% prepr
 ## $ Income                 &lt;fct&gt; &lt;25K, 50K -- 100K, &lt;25K, &gt;100K, 25K --50K, &gt;10…
 ## $ Country_region         &lt;fct&gt; North, East, East, South, East, North, East, N…
 ## $ Hotel_Type             &lt;fct&gt; City Hotel, City Hotel, City Hotel, Airport Ho…
-## $ Expected_checkin       &lt;date&gt; 2015-07-01, 2015-07-01, 2015-07-02, 2015-07-0…
-## $ Expected_checkout      &lt;date&gt; 2015-07-02, 2015-07-02, 2015-07-06, 2015-07-0…
-## $ Booking_date           &lt;date&gt; 2015-05-21, 2015-05-26, 2015-06-29, 2015-06-2…
 ## $ Adults                 &lt;dbl&gt; 2, 3, 3, 4, 1, 5, 2, 2, 3, 2, 1, 4, 1, 1, 1, 3…
 ## $ Children               &lt;dbl&gt; 2, 3, 3, 3, 1, 2, 1, 1, 2, 3, 3, 3, 2, 2, 2, 3…
 ## $ Babies                 &lt;dbl&gt; 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1…
@@ -233,15 +248,17 @@ valid &lt;- read_csv(&quot;../../data/Hotel-A-validation.csv&quot;) %&gt;% prepr
 ## $ Reservation_Status     &lt;fct&gt; Check-In, Check-In, Check-In, Check-In, Check-…
 ## $ Use_Promotion          &lt;fct&gt; Yes, No, No, Yes, Yes, Yes, Yes, No, Yes, Yes,…
 ## $ Discount_Rate          &lt;dbl&gt; 10, 0, 0, 5, 10, 10, 25, 0, 10, 20, 0, 10, 0, …
-## $ Room_Rate              &lt;dbl&gt; 218, 185, 119, 144, 242, 143, 212, 170, 245, 2…</code></pre>
+## $ Room_Rate              &lt;dbl&gt; 218, 185, 119, 144, 242, 143, 212, 170, 245, 2…
+## $ Lag                    &lt;dbl&gt; 41, 36, 3, 12, 13, 13, -1, 8, 84, 72, 20, 34, …
+## $ Duration               &lt;dbl&gt; 1, 1, 4, 1, 1, 1, 1, 1, 1, 3, 3, 1, 1, 4, 2, 1…</code></pre>
 <pre class="r"><code>table(train$Reservation_Status) / nrow(train)</code></pre>
 <pre><code>## 
-##   Canceled   Check-In    No-Show 
-## 0.15033274 0.77239172 0.07727554</code></pre>
+##   Check-In   Canceled    No-Show 
+## 0.77239172 0.15033274 0.07727554</code></pre>
 <pre class="r"><code>table(valid$Reservation_Status) / nrow(valid)</code></pre>
 <pre><code>## 
-##  Canceled  Check-In   No-Show 
-## 0.2695526 0.5856675 0.1447799</code></pre>
+##  Check-In  Canceled   No-Show 
+## 0.5856675 0.2695526 0.1447799</code></pre>
 <pre class="r"><code>skimr::skim(train)</code></pre>
 <table>
 <caption>Data summary</caption>
@@ -256,7 +273,7 @@ valid &lt;- read_csv(&quot;../../data/Hotel-A-validation.csv&quot;) %&gt;% prepr
 </tr>
 <tr class="odd">
 <td align="left">Number of columns</td>
-<td align="left">23</td>
+<td align="left">22</td>
 </tr>
 <tr class="even">
 <td align="left">_______________________</td>
@@ -267,67 +284,20 @@ valid &lt;- read_csv(&quot;../../data/Hotel-A-validation.csv&quot;) %&gt;% prepr
 <td align="left"></td>
 </tr>
 <tr class="even">
-<td align="left">Date</td>
-<td align="left">3</td>
-</tr>
-<tr class="odd">
 <td align="left">factor</td>
 <td align="left">14</td>
 </tr>
-<tr class="even">
-<td align="left">numeric</td>
-<td align="left">6</td>
-</tr>
 <tr class="odd">
+<td align="left">numeric</td>
+<td align="left">8</td>
+</tr>
+<tr class="even">
 <td align="left">________________________</td>
 <td align="left"></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">Group variables</td>
 <td align="left">None</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Variable type: Date</strong></p>
-<table>
-<thead>
-<tr class="header">
-<th align="left">skim_variable</th>
-<th align="right">n_missing</th>
-<th align="right">complete_rate</th>
-<th align="left">min</th>
-<th align="left">max</th>
-<th align="left">median</th>
-<th align="right">n_unique</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="left">Expected_checkin</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">2014-11-18</td>
-<td align="left">2017-09-06</td>
-<td align="left">2016-04-03</td>
-<td align="right">901</td>
-</tr>
-<tr class="even">
-<td align="left">Expected_checkout</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">2014-11-22</td>
-<td align="left">2017-09-09</td>
-<td align="left">2016-04-05</td>
-<td align="right">929</td>
-</tr>
-<tr class="odd">
-<td align="left">Booking_date</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">2014-01-09</td>
-<td align="left">2017-08-30</td>
-<td align="left">2015-11-22</td>
-<td align="right">1133</td>
 </tr>
 </tbody>
 </table>
@@ -554,325 +524,70 @@ valid &lt;- read_csv(&quot;../../data/Hotel-A-validation.csv&quot;) %&gt;% prepr
 <td align="right">250</td>
 <td align="left">▇▇▇▇▇</td>
 </tr>
-</tbody>
-</table>
-<pre class="r"><code>skimr::skim(valid)</code></pre>
-<table>
-<caption>Data summary</caption>
-<tbody>
 <tr class="odd">
-<td align="left">Name</td>
-<td align="left">valid</td>
-</tr>
-<tr class="even">
-<td align="left">Number of rows</td>
-<td align="left">2749</td>
-</tr>
-<tr class="odd">
-<td align="left">Number of columns</td>
-<td align="left">23</td>
-</tr>
-<tr class="even">
-<td align="left">_______________________</td>
-<td align="left"></td>
-</tr>
-<tr class="odd">
-<td align="left">Column type frequency:</td>
-<td align="left"></td>
-</tr>
-<tr class="even">
-<td align="left">Date</td>
-<td align="left">3</td>
-</tr>
-<tr class="odd">
-<td align="left">factor</td>
-<td align="left">14</td>
-</tr>
-<tr class="even">
-<td align="left">numeric</td>
-<td align="left">6</td>
-</tr>
-<tr class="odd">
-<td align="left">________________________</td>
-<td align="left"></td>
-</tr>
-<tr class="even">
-<td align="left">Group variables</td>
-<td align="left">None</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Variable type: Date</strong></p>
-<table>
-<thead>
-<tr class="header">
-<th align="left">skim_variable</th>
-<th align="right">n_missing</th>
-<th align="right">complete_rate</th>
-<th align="left">min</th>
-<th align="left">max</th>
-<th align="left">median</th>
-<th align="right">n_unique</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="left">Expected_checkin</td>
+<td align="left">Lag</td>
 <td align="right">0</td>
 <td align="right">1</td>
-<td align="left">2016-08-31</td>
-<td align="left">2017-09-09</td>
-<td align="left">2016-10-14</td>
-<td align="right">151</td>
+<td align="right">109.91</td>
+<td align="right">78.05</td>
+<td align="right">-4</td>
+<td align="right">45</td>
+<td align="right">101</td>
+<td align="right">166</td>
+<td align="right">708</td>
+<td align="left">▇▅▁▁▁</td>
 </tr>
 <tr class="even">
-<td align="left">Expected_checkout</td>
+<td align="left">Duration</td>
 <td align="right">0</td>
 <td align="right">1</td>
-<td align="left">2016-09-01</td>
-<td align="left">2017-09-13</td>
-<td align="left">2016-10-16</td>
-<td align="right">156</td>
-</tr>
-<tr class="odd">
-<td align="left">Booking_date</td>
-<td align="right">0</td>
+<td align="right">1.84</td>
+<td align="right">0.99</td>
 <td align="right">1</td>
-<td align="left">2016-01-26</td>
-<td align="left">2017-08-02</td>
-<td align="left">2016-06-28</td>
-<td align="right">322</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Variable type: factor</strong></p>
-<table>
-<thead>
-<tr class="header">
-<th align="left">skim_variable</th>
-<th align="right">n_missing</th>
-<th align="right">complete_rate</th>
-<th align="left">ordered</th>
-<th align="right">n_unique</th>
-<th align="left">top_counts</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="left">Gender</td>
-<td align="right">0</td>
 <td align="right">1</td>
-<td align="left">FALSE</td>
 <td align="right">2</td>
-<td align="left">F: 1396, M: 1353</td>
-</tr>
-<tr class="even">
-<td align="left">Ethnicity</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">FALSE</td>
+<td align="right">2</td>
 <td align="right">4</td>
-<td align="left">cau: 697, Afr: 685, Lat: 685, Asi: 682</td>
-</tr>
-<tr class="odd">
-<td align="left">Educational_Level</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">FALSE</td>
-<td align="right">4</td>
-<td align="left">Col: 1124, Mid: 553, Gra: 540, Hig: 532</td>
-</tr>
-<tr class="even">
-<td align="left">Income</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">FALSE</td>
-<td align="right">4</td>
-<td align="left">50K: 786, &lt;25: 785, 25K: 778, &gt;10: 400</td>
-</tr>
-<tr class="odd">
-<td align="left">Country_region</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">FALSE</td>
-<td align="right">4</td>
-<td align="left">Sou: 1093, Eas: 563, Nor: 560, Wes: 533</td>
-</tr>
-<tr class="even">
-<td align="left">Hotel_Type</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">FALSE</td>
-<td align="right">3</td>
-<td align="left">Air: 976, Cit: 901, Res: 872</td>
-</tr>
-<tr class="odd">
-<td align="left">Meal_Type</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">FALSE</td>
-<td align="right">3</td>
-<td align="left">FB: 937, BB: 922, HB: 890</td>
-</tr>
-<tr class="even">
-<td align="left">Visted_Previously</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">FALSE</td>
-<td align="right">2</td>
-<td align="left">No: 1791, Yes: 958</td>
-</tr>
-<tr class="odd">
-<td align="left">Previous_Cancellations</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">FALSE</td>
-<td align="right">2</td>
-<td align="left">No: 2421, Yes: 328</td>
-</tr>
-<tr class="even">
-<td align="left">Deposit_type</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">FALSE</td>
-<td align="right">3</td>
-<td align="left">No : 1843, Ref: 687, Non: 219</td>
-</tr>
-<tr class="odd">
-<td align="left">Booking_channel</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">FALSE</td>
-<td align="right">3</td>
-<td align="left">Onl: 1569, Dir: 784, Age: 396</td>
-</tr>
-<tr class="even">
-<td align="left">Required_Car_Parking</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">FALSE</td>
-<td align="right">2</td>
-<td align="left">Yes: 1959, No: 790</td>
-</tr>
-<tr class="odd">
-<td align="left">Reservation_Status</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">FALSE</td>
-<td align="right">3</td>
-<td align="left">Che: 1610, Can: 741, No-: 398</td>
-</tr>
-<tr class="even">
-<td align="left">Use_Promotion</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="left">FALSE</td>
-<td align="right">2</td>
-<td align="left">Yes: 2085, No: 664</td>
+<td align="left">▇▅▁▃▂</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Variable type: numeric</strong></p>
-<table>
-<thead>
-<tr class="header">
-<th align="left">skim_variable</th>
-<th align="right">n_missing</th>
-<th align="right">complete_rate</th>
-<th align="right">mean</th>
-<th align="right">sd</th>
-<th align="right">p0</th>
-<th align="right">p25</th>
-<th align="right">p50</th>
-<th align="right">p75</th>
-<th align="right">p100</th>
-<th align="left">hist</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="left">Age</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">44.20</td>
-<td align="right">15.21</td>
-<td align="right">18</td>
-<td align="right">31</td>
-<td align="right">44</td>
-<td align="right">57</td>
-<td align="right">70</td>
-<td align="left">▇▇▇▇▇</td>
-</tr>
-<tr class="even">
-<td align="left">Adults</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">2.34</td>
-<td align="right">1.19</td>
-<td align="right">1</td>
-<td align="right">1</td>
-<td align="right">2</td>
-<td align="right">3</td>
-<td align="right">5</td>
-<td align="left">▅▇▃▂▂</td>
-</tr>
-<tr class="odd">
-<td align="left">Children</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">1.74</td>
-<td align="right">0.72</td>
-<td align="right">1</td>
-<td align="right">1</td>
-<td align="right">2</td>
-<td align="right">2</td>
-<td align="right">3</td>
-<td align="left">▇▁▇▁▃</td>
-</tr>
-<tr class="even">
-<td align="left">Babies</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">0.33</td>
-<td align="right">0.57</td>
-<td align="right">0</td>
-<td align="right">0</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">2</td>
-<td align="left">▇▁▂▁▁</td>
-</tr>
-<tr class="odd">
-<td align="left">Discount_Rate</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">12.48</td>
-<td align="right">11.17</td>
-<td align="right">0</td>
-<td align="right">5</td>
-<td align="right">10</td>
-<td align="right">20</td>
-<td align="right">40</td>
-<td align="left">▇▅▃▃▁</td>
-</tr>
-<tr class="even">
-<td align="left">Room_Rate</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">173.74</td>
-<td align="right">43.88</td>
-<td align="right">100</td>
-<td align="right">136</td>
-<td align="right">173</td>
-<td align="right">212</td>
-<td align="right">250</td>
-<td align="left">▇▇▇▇▇</td>
-</tr>
-</tbody>
-</table>
-<pre class="r"><code># TODO write function to get chisquare p values of all factor variables
-table(train$Hotel_Type,train$Reservation_Status) %&gt;% summary() %&gt;% .$p.value</code></pre>
-<pre><code>## [1] 0.08267534</code></pre>
+<pre class="r"><code>cat_cols &lt;- train %&gt;% select_if(is.factor) %&gt;% colnames()
+map_dfr(cat_cols, function(x){
+  pval &lt;- table(train[[x]],train$Reservation_Status) %&gt;% summary() %&gt;% .$p.value  
+  return(list(column = x,rejected = pval &lt; 0.05))
+}) %&gt;% filter(rejected == TRUE)</code></pre>
+<pre><code>## # A tibble: 3 x 2
+##   column             rejected
+##   &lt;chr&gt;              &lt;lgl&gt;   
+## 1 Meal_Type          TRUE    
+## 2 Deposit_type       TRUE    
+## 3 Reservation_Status TRUE</code></pre>
+<pre class="r"><code># TODO insert evaluation pipeline here</code></pre>
+<pre class="r"><code>model &lt;- randomForest(Reservation_Status ~ .,data=train)</code></pre>
+<pre class="r"><code>evaluate &lt;- function(y_preds,y_true){
+  print(ConfusionMatrix(y_preds,y_true))
+  print(F1_Score(y_preds,y_true))
+  print(Precision(y_preds,y_true))
+  print(Recall(y_preds,y_true))
+}</code></pre>
+<pre class="r"><code>y_preds &lt;- predict(model,newdata=valid %&gt;% select(-Reservation_Status))
+evaluate(y_preds,valid$Reservation_Status)</code></pre>
+<pre><code>##           y_pred
+## y_true     Check-In Canceled No-Show
+##   Check-In     1610        0       0
+##   Canceled      741        0       0
+##   No-Show       398        0       0
+## [1] 0.7387015
+## [1] 1
+## [1] 0.5856675</code></pre>
+<pre class="r"><code>make_submission &lt;- function(test_preds,name){
+  submission &lt;- tibble(`Reservation-id` = test$`Reservation-id`,
+                       Reservation_status = test_preds)
+  submission %&gt;% write_csv(paste(&quot;../../data/submissions/&quot;,name,&quot;-&quot;,Sys.time(),&quot;.csv&quot;))
+}</code></pre>
+<pre class="r"><code>test_preds &lt;- predict(model,newdata = test)
+make_submission(as.numeric(test_preds),&quot;naive&quot;)</code></pre>
 
 
 

@@ -22,14 +22,21 @@ preprocess <- function(tib,test=FALSE){
   date_columns <- c("Expected_checkin","Expected_checkout","Booking_date")
   tib <- tib %>% 
     mutate_at(vars(contains(date_columns)),~ as.Date(.x,format="%m/%d/%Y")) %>% 
-    mutate_if(is.character,factor)
+    mutate_if(is.character,factor) %>% 
+    mutate(Lag = as.numeric(Expected_checkin - Booking_date,units="days"),
+           Duration = as.numeric(Expected_checkout - Expected_checkin,units="days")) %>% 
+    select(-all_of(date_columns))
+  cat_cols <- tib %>% select_if(is.factor) %>% colnames()
+  cat_cols_keep <- c("Meal_Type","Deposit_type","Reservation_Status")
+  cat_cols_rmv <- cat_cols[!(cat_cols %in% cat_cols_keep)]
+  # tib <- tib %>% select(-all_of(cat_cols_rmv))
   if(!test){
     tib <- tib %>% 
       select(-`Reservation-id`) %>% 
       mutate(Reservation_Status = factor(Reservation_Status,
                                          levels=c("Check-In","Canceled","No-Show")))
   }
-  tib
+  tib 
 }
 ```
 
@@ -57,12 +64,11 @@ skimr::skim(train)
 ```
 
 ```{r}
-skimr::skim(valid)
-```
-
-```{r}
-# TODO write function to get chisquare p values of all factor variables
-table(train$Hotel_Type,train$Reservation_Status) %>% summary() %>% .$p.value
+cat_cols <- train %>% select_if(is.factor) %>% colnames()
+map_dfr(cat_cols, function(x){
+  pval <- table(train[[x]],train$Reservation_Status) %>% summary() %>% .$p.value  
+  return(list(column = x,rejected = pval < 0.05))
+}) %>% filter(rejected == TRUE)
 ```
 
 ```{r}
