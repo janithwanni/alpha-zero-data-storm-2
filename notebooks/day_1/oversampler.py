@@ -15,7 +15,7 @@ def oversample(dataframe: pd.DataFrame, cat_feats: List[int]):
 
 train_df = pd.read_csv("../../data/processed/train_preproc.csv")
 categorical_columns = ["Gender","Ethnicity","Educational_Level","Income","Country_region","Hotel_Type",
-                       "Meal_Type","Visited_Previously","Previous_Cancellations","Deposit_type","Booking_channel",]
+                       "Meal_Type","Visited_Previously","Previous_Ca ncellations","Deposit_type","Booking_channel",]
 # numerical_columns = ['age', 'weigth', ']
 # column_trans = make_column_transformer(
 #     (categorical_columns, OneHotEncoder(handle_unknown='ignore'),
