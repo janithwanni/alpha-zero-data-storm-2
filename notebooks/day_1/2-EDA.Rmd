@@ -1,0 +1,99 @@
+---
+title: "2-EDA"
+author: "Janith Wanniarachchi"
+date: "3/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+```{r}
+train <- read_csv("../../data/processed/train_preproc.csv")
+test <- read_csv("../../data/processed/test_preproc.csv")
+valid <- read_csv("../../data/processed/valid_preproc.csv")
+```
+
+```{r}
+glimpse(train)
+```
+
+```{r}
+table(train$Income)
+
+train_temp <- train %>% 
+  mutate(Income_number = case_when(
+    Income == "<25K" ~ 25000,
+    Income == ">100K" ~ 100000,
+    Income == "25K --50K" ~ 37500,
+    Income == "50K -- 100K" ~ 75000
+  ),
+  Cost = Duration * Room_Rate,
+  Cost_Income = Cost / Income_number,
+  Visit_Cancel = case_when(
+    Visted_Previously == "Yes" & Previous_Cancellations == "Yes" ~ "Visit_n_Cancel",
+    Visted_Previously == "Yes" & Previous_Cancellations == "No" ~ "Visit_n_No_Cancel",
+    Visted_Previously == "No" & Previous_Cancellations == "Yes" ~ "No_Visit_n_Cancel",
+    Visted_Previously == "No" & Previous_Cancellations == "No" ~ "No_Visit_n_No_Cancel",
+  ),
+  Total_PAX = Adults + Babies + Children,
+  N_Minors = Babies + Children)
+```
+
+```{r}
+table(train_temp$N_Minors)
+```
+
+
+# Lag ~ Response ANOVA
+```{r}
+ggplot(train_temp,aes(x = Reservation_Status,y = Lag))+geom_boxplot()+theme_minimal()
+```
+
+```{r}
+aov(Lag ~ Reservation_Status,data=train_temp) %>% summary.lm()
+```
+
+There is no effect by Lag
+
+# Cost ~ Response ANOVA
+```{r}
+ggplot(train_temp,aes(x = Reservation_Status,y = Cost))+geom_boxplot(alpha=0.1)+theme_minimal()
+```
+
+```{r}
+aov(Cost ~ Reservation_Status,data=train_temp) %>% summary.lm()
+```
+
+Cost has no effect
+
+# Cost_Income ~ Response ANOVA
+```{r}
+ggplot(train_temp,aes(x = Reservation_Status,y = Cost_Income))+geom_boxplot()+theme_minimal()
+```
+```{r}
+aov(Cost_Income ~ Reservation_Status,data=train_temp) %>% summary.lm()
+```
+
+# Visit Cancel ~ Response Chi Squared
+```{r}
+table(train_temp$Visit_Cancel,train_temp$Reservation_Status) %>% summary()
+```
+
+Visit Cancel has an effect
+
+# Adults Babies Children With Chi Square
+```{r}
+table(train_temp$Total_PAX,train_temp$Reservation_Status) %>% summary()
+```
+
+```{r}
+table(train_temp$N_Minors,train_temp$Reservation_Status) %>% summary()
+```
+
+
+```{r}
+unique(train_temp$Room_Rate)
+```

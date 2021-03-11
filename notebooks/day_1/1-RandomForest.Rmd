@@ -1,0 +1,15 @@
+---
+title: "1-RandomForest"
+author: "Janith Wanniarachchi"
+date: "3/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+```
+
