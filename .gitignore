@@ -185,3 +185,6 @@ cython_debug/
 
 /notebooks/day_1/models/
 /notebooks/day_1/models_oversample/
+/notebooks/day_1/output/
+/notebooks/day_2/output/
+/notebooks/day_3/output/

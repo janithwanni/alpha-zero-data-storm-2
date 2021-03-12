@@ -11,7 +11,10 @@ library(tidyverse)
 ```
 
 ```{r}
-train_os <- read_csv("../../data/processed/oversampled/train_oversample.csv")
+train_os <- read_csv("../../data/processed/oversampled/train_oversample.csv") %>% 
+  mutate_if(is.character,factor) %>% 
+  mutate(Reservation_Status = factor(Reservation_Status,
+                                         levels=c("Check-In","Canceled","No-Show")))
 ```
 
 ```{r}
@@ -21,4 +24,32 @@ table(train_os$Reservation_Status)
 ```{r}
 skimr::skim(train_os)
 ```
+
+```{r}
+cat_cols <- train_os %>% select_if(is.factor) %>% colnames()
+map_dfr(cat_cols, function(x){
+  pval <- table(train_os[[x]],train_os$Reservation_Status) %>% summary() %>% .$p.value  
+  return(list(column = x,rejected = pval < 0.05))
+}) %>% filter(rejected == TRUE)
+```
+
+```{r}
+# GGally::ggpairs(train_os %>% select_if(is.factor),aes(color=Reservation_Status),progress=FALSE)
+# ggsave("output/pair_oversampled.png",width = 841,height = 594,units = "mm")
+```
+
+```{r}
+# cols <- c(train_os %>% select_if(~ !is.factor(.x)) %>% colnames(),"Reservation_Status")
+# GGally::ggpairs(train_os %>% select(all_of(cols)),
+#                 aes(color=Reservation_Status),progress=FALSE)
+# ggsave("output/pair_oversampled.png",width = 841,height = 594,units = "mm")
+```
+
+```{r}
+library(ggfortify)
+pca_res <- prcomp(train_os %>% select_if(is.numeric), scale. = TRUE)
+autoplot(pca_res, data = train_os, colour = 'Reservation_Status')
+```
+
+
 

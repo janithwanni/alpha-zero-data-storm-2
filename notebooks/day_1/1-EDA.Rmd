@@ -61,9 +61,9 @@ preprocess <- function(tib,test=FALSE){
 train <- read_csv("../../data/Hotel-A-train.csv") %>% preprocess()
 test <- read_csv("../../data/Hotel-A-test.csv") %>% preprocess(test=TRUE)
 valid <- read_csv("../../data/Hotel-A-validation.csv") %>% preprocess()
-train %>% write_csv("../../data/processed/train_preproc.csv")
-test %>% write_csv("../../data/processed/test_preproc.csv")
-valid %>% write_csv("../../data/processed/valid_preproc.csv")
+# train %>% write_csv("../../data/processed/train_preproc.csv")
+# test %>% write_csv("../../data/processed/test_preproc.csv")
+# valid %>% write_csv("../../data/processed/valid_preproc.csv")
 ```
 
 ```{r}
@@ -89,8 +89,16 @@ map_dfr(cat_cols, function(x){
 ```
 
 ```{r}
-#GGally::ggpairs(train,aes(color=Reservation_Status,alpha=0.2),progress = FALSE)
-#ggsave("outputs/pair_plot_colored.jpg",width = 841,height = 594,units = "mm")
+# cols <- c(train %>% select_if(~ is.factor(.x)) %>% colnames(),"Reservation_Status")
+# GGally::ggpairs(train %>% select(all_of(cols)),
+#                 aes(color=Reservation_Status,alpha=0.2),progress = FALSE)
+# ggsave("outputs/pair_plot_colored.jpg",width = 841,height = 594,units = "mm")
+```
+
+```{r}
+library(ggfortify)
+pca_res <- prcomp(train %>% select_if(is.numeric), scale. = TRUE)
+autoplot(pca_res, data = train, colour = 'Reservation_Status')
 ```
 
 

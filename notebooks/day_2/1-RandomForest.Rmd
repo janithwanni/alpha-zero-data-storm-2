@@ -1,0 +1,61 @@
+---
+title: "1-RandomForest"
+author: "Janith Wanniarachchi"
+date: "3/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(randomForest)
+library(MLmetrics)
+train <- read_csv("../../data/processed/oversampled/train_oversample.csv") %>% 
+  mutate_if(is.character,factor) %>% 
+  mutate(Reservation_Status = factor(Reservation_Status,
+                                         levels=c("Check-In","Canceled","No-Show"))) %>% 
+  select(Reservation_Status,N_Minors,Total_PAX,Income_number,Cost,Cost_Income,Lag,Duration)
+valid <- read_csv("../../data/processed/valid_preproc.csv") %>% 
+  mutate_if(is.character,factor) %>% 
+  mutate(Reservation_Status = factor(Reservation_Status,
+                                         levels=c("Check-In","Canceled","No-Show"))) %>% 
+  select(Reservation_Status,N_Minors,Total_PAX,Income_number,Cost,Cost_Income,Lag,Duration)
+```
+
+```{r}
+model <- randomForest(Reservation_Status ~ .,data=train)
+```
+```{r}
+plot_importances <- function(model){
+  imp <- importance(model)
+  imp %>% 
+    as_tibble() %>% 
+    mutate(variable = factor(rownames(imp))) %>% 
+    arrange(-MeanDecreaseGini) %>% 
+    mutate(variable = fct_reorder(variable,MeanDecreaseGini)) %>% 
+  ggplot(aes(x = variable,y=MeanDecreaseGini)) + 
+    geom_col()+
+    coord_flip()
+}
+plot_importances(model)
+```
+
+```{r}
+evaluate <- function(y_preds,y_true){
+  cm <- caret::confusionMatrix(y_preds,reference=y_true,mode="everything")
+  print(ConfusionMatrix(y_preds,y_true))
+  print(cm)
+  # print(F1_Score_macro_weighted(y_preds,y_true))
+  # print(Precision(y_preds,y_true))
+  # print(Recall(y_preds,y_true))
+  print(mean(cm$byClass[,"F1"],na.rm=TRUE))
+}
+```
+
+```{r}
+y_preds <- predict(model,newdata=valid %>% select(-Reservation_Status))
+evaluate(y_preds,valid$Reservation_Status)
+```
