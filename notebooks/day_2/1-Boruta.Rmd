@@ -1,0 +1,32 @@
+---
+title: "1-Boruta"
+author: "Janith Wanniarachchi"
+date: "3/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(Boruta)
+```
+
+```{r}
+train_os <- read_csv("../../data/processed/train_preproc.csv") %>% 
+  mutate_if(is.character,factor) %>% 
+  mutate(Reservation_Status = factor(Reservation_Status,
+                                         levels=c("Check-In","Canceled","No-Show")))
+```
+
+```{r}
+boruta_output <- Boruta(Reservation_Status ~ .,data = train_os,doTrace=100,pValue=0.05)
+```
+
+```{r}
+boruta_output %>% plot(cex.axis=.7, las=2,xlab="")
+```
+
+```{r}
+boruta_output$finalDecision[boruta_output$finalDecision == "Confirmed"] %>% names()
+```
+
