@@ -17,12 +17,12 @@ train <- read_csv("../../data/processed/oversampled/train_oversample.csv") %>%
   mutate_if(is.character,factor) %>% 
   mutate(Reservation_Status = factor(Reservation_Status,
                                          levels=c("Check-In","Canceled","No-Show"))) %>% 
-  select(Reservation_Status,N_Minors,Total_PAX,Income_number,Cost,Cost_Income,Lag,Duration)
+  select(Reservation_Status,N_Minors,Total_PAX,Income_number,Cost,Cost_Income,Lag,Meal_Type)
 valid <- read_csv("../../data/processed/valid_preproc.csv") %>% 
   mutate_if(is.character,factor) %>% 
   mutate(Reservation_Status = factor(Reservation_Status,
                                          levels=c("Check-In","Canceled","No-Show"))) %>% 
-  select(Reservation_Status,N_Minors,Total_PAX,Income_number,Cost,Cost_Income,Lag,Duration)
+  select(Reservation_Status,N_Minors,Total_PAX,Income_number,Cost,Cost_Income,Lag,Meal_Type)
 ```
 
 ```{r}
