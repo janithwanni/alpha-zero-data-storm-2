@@ -3,10 +3,10 @@ import pandas as pd
 from datetime import datetime
 
 # train_df = pd.read_csv("../../data/processed/train_preproc.csv")
-train_data = TabularDataset("../../data/processed/train_preproc.csv")
+train_data = TabularDataset("../../data/processed/oversampled/train_oversample.csv")
 # train_data = train_data.drop(["Age","Room_Rate","Discount_Rate"],axis="columns")
-save_path = "models"
-predictor = TabularPredictor(label="Reservation_Status",path=save_path,eval_metric="f1_macro").fit(train_data,time_limit=4500,
+save_path = "models_oversample"
+predictor = TabularPredictor(label="Reservation_Status",path=save_path,eval_metric="f1_macro").fit(train_data,time_limit=180,
                                                                                              presets="best_quality")
 
 valid_data = TabularDataset("../../data/processed/valid_preproc.csv")

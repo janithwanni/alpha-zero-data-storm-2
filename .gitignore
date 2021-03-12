@@ -184,3 +184,4 @@ dmypy.json
 cython_debug/
 
 /notebooks/day_1/models/
+/notebooks/day_1/models_oversample/
