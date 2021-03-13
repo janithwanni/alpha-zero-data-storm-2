@@ -188,3 +188,4 @@ cython_debug/
 /notebooks/day_1/output/
 /notebooks/day_2/output/
 /notebooks/day_3/output/
+/notebooks/day_1/models_oversample_valid/
