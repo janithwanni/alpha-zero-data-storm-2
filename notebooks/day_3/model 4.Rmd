@@ -1,0 +1,48 @@
+---
+title: "svm_combined"
+author: "Ann"
+date: "3/13/2021"
+output: html_document
+---
+
+```{r}
+knitr::opts_chunk$set(warning = FALSE,message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(e1071)
+library(MLmetrics)
+```
+
+```{r}
+df_trainValidate <- read.csv("C://Users//Asus//OneDrive//Desktop//DataStorm2021//train_valid_feat_eng_oversample.csv", stringsAsFactors = TRUE, header = TRUE)
+df_train <-read.csv("C://Users//Asus//OneDrive//Desktop//DataStorm2021//train_feat_eng_oversample.csv", stringsAsFactors = TRUE, header = TRUE)
+df_validate <-read.csv("C://Users//Asus//OneDrive//Desktop//DataStorm2021//valid_preproc.csv", stringsAsFactors = TRUE, header = TRUE)
+
+
+```
+
+```{r}
+model1 <- svm(Reservation_Status ~.,df_train, cost = 5, type = "nu-classification")
+
+model2 <- svm(Reservation_Status ~.,df_trainValidate, cost = 5, type = "nu-classification")
+
+validate1 <- df_validate
+validate2 <- df_validate
+
+validate1$Pred <- predict(model1, validate1)
+validate2$Pred <- predict(model2, validate2)
+
+table(validate1$Pred, validate1$Reservation_Status)
+table(validate2$Pred, validate2$Reservation_Status)
+
+
+F1_Score(validate1$Reservation_Status, validate1$Pred)
+F1_Score(validate2$Reservation_Status, validate2$Pred)
+
+
+
+```
+
+
